@@ -1,5 +1,44 @@
 {
-  "client": { "slug": "letsbridge", "name": "Let's Bridge" },
-  "campaign": { "title": "Connector-rekrytering", "period": "Juni–Aug 2026", "by": "Shiny Happy People", "date": "26-06-03", "version": "v1" },
-  "ads": []
+  "client": {
+    "slug": "letsbridge",
+    "name": "Let's Bridge"
+  },
+  "campaign": {
+    "title": "Connector-rekrytering",
+    "period": "Juni–Aug 2026",
+    "by": "Shiny Happy People",
+    "date": "26-06-03",
+    "version": "v1"
+  },
+  "ads": [
+    {
+      "id": "ad_mpzqxaw84r0u",
+      "platform": "Meta",
+      "placement": "Feed",
+      "campaign": "Test 1",
+      "name": "Test",
+      "objective": "Awareness",
+      "audience": "",
+      "region": "Sverige",
+      "language": "Svenska",
+      "format": "1:1",
+      "headline": "abhrfbh",
+      "primaryText": "adrbhaerhberbh",
+      "cta": "Läs mer",
+      "url": "",
+      "assetType": "Bild",
+      "assetUrl": "",
+      "assetData": "",
+      "budget": "",
+      "startDate": "",
+      "endDate": "",
+      "status": "Utkast",
+      "approver": "",
+      "approvedDate": "",
+      "clientComment": "",
+      "notes": "",
+      "created": "26-06-04",
+      "updated": "26-06-04"
+    }
+  ]
 }
