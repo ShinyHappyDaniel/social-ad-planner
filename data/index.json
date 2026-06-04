@@ -1,5 +1,8 @@
 {
   "clients": [
-    { "slug": "letsbridge", "name": "Let's Bridge" }
+    {
+      "slug": "letsbridge",
+      "name": "Let's Bridge"
+    }
   ]
 }
