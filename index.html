@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="sv" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHP · Social Ad Planner</title>
+<meta name="description" content="Annonsöversikt och kundgodkännande, Shiny Happy People.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ TOPBAR ============ -->
+<header class="topbar">
+  <div class="topbar-left">
+    <a class="logo" href="?" title="Shiny Happy People">
+      <img class="logo-pink" src="assets/logos/shp-pink.png" alt="Shiny Happy People">
+      <img class="logo-white" src="assets/logos/shp-white.png" alt="Shiny Happy People">
+    </a>
+    <div class="brandline">
+      <span class="brandline-kicker">Social Ad Planner</span>
+      <span class="brandline-sub" id="brandClient">—</span>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <label class="client-select">
+      <span class="sr-only">Kund</span>
+      <select id="clientSwitcher" aria-label="Välj kund"></select>
+    </label>
+    <button class="btn btn-ghost" id="addClientBtn" title="Ny kund">+ Kund</button>
+    <span class="divider" aria-hidden="true"></span>
+    <button class="btn" id="addAdBtn">+ Annons</button>
+    <button class="btn btn-ghost" id="exportBtn" title="Exportera JSON">Exportera</button>
+    <button class="btn btn-ghost" id="importBtn" title="Importera JSON">Importera</button>
+    <button class="btn btn-ghost" id="printBtn" title="Skriv ut / PDF">Skriv ut</button>
+    <button class="btn btn-primary" id="saveBtn" title="Spara till GitHub (live-länk)">Spara</button>
+    <button class="btn btn-icon" id="themeBtn" title="Växla ljust/mörkt läge" aria-label="Växla tema">◐</button>
+  </div>
+</header>
+
+<!-- ============ CAMPAIGN HEADER / SUMMARY ============ -->
+<section class="sheet" id="sheet">
+
+  <div class="cover" id="cover">
+    <div class="cover-grid">
+      <div class="cover-field">
+        <label>Kund</label>
+        <input type="text" id="covClient" placeholder="Kundnamn">
+      </div>
+      <div class="cover-field">
+        <label>Kampanj</label>
+        <input type="text" id="covCampaign" placeholder="Kampanjnamn">
+      </div>
+      <div class="cover-field">
+        <label>Period</label>
+        <input type="text" id="covPeriod" placeholder="t.ex. Juni–Aug 2026">
+      </div>
+      <div class="cover-field">
+        <label>Framtaget av</label>
+        <input type="text" id="covBy" placeholder="Shiny Happy People">
+      </div>
+      <div class="cover-field">
+        <label>Datum</label>
+        <input type="text" id="covDate" placeholder="ÅÅ-MM-DD">
+      </div>
+      <div class="cover-field">
+        <label>Version</label>
+        <input type="text" id="covVersion" placeholder="v1">
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary counters -->
+  <div class="summary" id="summary"></div>
+
+  <!-- Filters + view toggle -->
+  <div class="toolbar">
+    <div class="filters" id="platformFilter">
+      <button class="chip-btn is-active" data-filter="all">Alla</button>
+      <button class="chip-btn" data-filter="Meta">Meta</button>
+      <button class="chip-btn" data-filter="YouTube">YouTube</button>
+      <button class="chip-btn" data-filter="TikTok">TikTok</button>
+    </div>
+    <div class="filters" id="statusFilter">
+      <button class="chip-btn is-active" data-status="all">Alla statusar</button>
+      <button class="chip-btn" data-status="Utkast">Utkast</button>
+      <button class="chip-btn" data-status="Redo för granskning">Redo</button>
+      <button class="chip-btn" data-status="Godkänd">Godkänd</button>
+      <button class="chip-btn" data-status="Ändring begärd">Ändring begärd</button>
+    </div>
+    <div class="view-toggle">
+      <button class="chip-btn is-active" data-view="cards">Kort</button>
+      <button class="chip-btn" data-view="table">Tabell</button>
+    </div>
+  </div>
+
+  <!-- Ads render target -->
+  <main id="adsContainer" class="ads-container"></main>
+
+  <div class="empty-state" id="emptyState" hidden>
+    <p class="empty-title">Inga annonser än</p>
+    <p>Klicka på <strong>+ Annons</strong> för att lägga till den första.</p>
+  </div>
+
+  <!-- Sign-off -->
+  <footer class="signoff">
+    <div class="signoff-line">
+      <span class="signoff-label">Godkänt av kund</span>
+      <span class="signoff-rule"></span>
+    </div>
+    <div class="signoff-line">
+      <span class="signoff-label">Datum</span>
+      <span class="signoff-rule short"></span>
+    </div>
+    <p class="signoff-note">Genererat med SHP Social Ad Planner · <span id="footVersion"></span></p>
+  </footer>
+
+</section>
+
+<!-- ============ EDIT DRAWER ============ -->
+<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+<aside class="drawer" id="drawer" hidden aria-label="Redigera annons">
+  <div class="drawer-head">
+    <h2 class="drawer-title" id="drawerTitle">Annons</h2>
+    <button class="btn btn-icon" id="drawerClose" aria-label="Stäng">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"><!-- fields injected --></div>
+  <div class="drawer-foot">
+    <button class="btn btn-ghost btn-danger" id="deleteAdBtn">Ta bort</button>
+    <button class="btn btn-primary" id="saveAdBtn">Klar</button>
+  </div>
+</aside>
+
+<!-- ============ GITHUB TOKEN MODAL ============ -->
+<div class="modal-backdrop" id="tokenBackdrop" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tokenTitle">
+    <h2 id="tokenTitle">Spara till GitHub</h2>
+    <p class="modal-text">
+      För att uppdatera live-länken committas datan till repot <code>social-ad-planner</code>
+      via GitHubs API. Klistra in en <strong>fine-grained personal access token</strong> med
+      <em>Contents: Read and write</em> på just det repot. Token sparas lokalt i din webbläsare,
+      aldrig i repot, och kan återkallas när som helst på GitHub.
+    </p>
+    <input type="password" id="tokenInput" placeholder="github_pat_…" autocomplete="off">
+    <label class="modal-check"><input type="checkbox" id="tokenRemember" checked> Kom ihåg på den här datorn</label>
+    <div class="modal-foot">
+      <a class="link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Skapa token →</a>
+      <span class="modal-foot-spacer"></span>
+      <button class="btn btn-ghost" id="tokenCancel">Avbryt</button>
+      <button class="btn btn-primary" id="tokenSave">Spara &amp; committa</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept="application/json" hidden>
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
