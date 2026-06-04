@@ -31,6 +31,13 @@ const PLATFORMS = {
 const STATUSES = ["Utkast", "Redo för granskning", "Godkänd", "Ändring begärd"];
 const STATUS_CLASS = { "Utkast": "s-utkast", "Redo för granskning": "s-redo", "Godkänd": "s-godkänd", "Ändring begärd": "s-ändring" };
 const AR_CLASS = { "1:1": "ar-1-1", "4:5": "ar-4-5", "9:16": "ar-9-16", "16:9": "ar-16-9" };
+const ASPECTS = ["1:1", "4:5", "9:16", "16:9"];
+function assetFor(a, fmt) {
+  if (!a.assets) a.assets = [];
+  let s = a.assets.find(x => x.format === fmt);
+  if (!s) { s = { format: fmt, type: "Bild", url: "", data: "" }; a.assets.push(s); }
+  return s;
+}
 
 /* ---------------- State ---------------- */
 let clients = [];                 // [{slug,name}]
@@ -75,7 +82,7 @@ function emptyAd() {
     id: uid(), platform: "Meta", placement: "Feed", campaign: "", name: "", objective: "Awareness",
     audience: "", region: "Sverige", language: "Svenska", format: "1:1",
     headline: "", primaryText: "", cta: "Läs mer", url: "",
-    assetType: "Bild", assetUrl: "", assetData: "",
+    assets: [],
     budget: "", startDate: "", endDate: "",
     status: "Utkast", approver: "", approvedDate: "", clientComment: "", notes: "",
     created: now, updated: now
@@ -122,6 +129,14 @@ async function loadDoc(sg) {
   if (!doc.client) doc.client = { slug: sg, name: clientName(sg) };
   doc.client.slug = sg;
   if (!doc.ads) doc.ads = [];
+  // migrera ev. äldre annonser med en enda asset till assets[]
+  doc.ads.forEach(a => {
+    if (!Array.isArray(a.assets)) {
+      a.assets = [];
+      if (a.assetData || a.assetUrl) a.assets.push({ format: a.format || "1:1", type: a.assetType || "Bild", url: a.assetUrl || "", data: a.assetData || "" });
+    }
+    delete a.assetData; delete a.assetUrl; delete a.assetType;
+  });
 }
 function clientName(sg) { const c = clients.find(c => c.slug === sg); return c ? c.name : ""; }
 
@@ -208,10 +223,13 @@ function renderAds() {
 }
 
 function cardHTML(a) {
-  const ar = AR_CLASS[a.format] || "ar-1-1";
-  const thumb = a.assetData ? `<img src="${esc(a.assetData)}" alt="">`
-    : a.assetUrl ? `<img src="${esc(a.assetUrl)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph',textContent:'${a.assetType === 'Film' ? 'FILM' : 'BILD'}'}))">`
-    : `<span class="ph">${a.assetType === "Film" ? "▶ Film" : "Ingen asset"}</span>`;
+  const media = (a.assets || []).filter(s => s.data || s.url);
+  const primary = media.find(s => s.format === a.format) || media[0] || null;
+  const ar = AR_CLASS[(primary && primary.format) || a.format] || "ar-1-1";
+  const thumb = primary && primary.data ? `<img src="${esc(primary.data)}" alt="">`
+    : primary && primary.url ? `<img src="${esc(primary.url)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph',textContent:'${primary.type === 'Film' ? '▶ FILM' : 'BILD'}'}))">`
+    : `<span class="ph">Ingen asset</span>`;
+  const fmtTags = media.length ? media.map(s => esc(s.format)).join(" · ") : esc(a.format);
   const meta = [
     ["Audience", a.audience], ["Region", a.region], ["Mål", a.objective], ["Placering", a.placement]
   ].filter(([, v]) => v).map(([l, v]) =>
@@ -219,7 +237,7 @@ function cardHTML(a) {
   return `<article class="ad-card" data-id="${a.id}">
     <div class="preview-thumb ${ar}">
       <span class="preview-badge">${esc(a.platform)}</span>
-      <span class="preview-ar">${esc(a.format)}</span>
+      <span class="preview-ar">${fmtTags}</span>
       ${thumb}
     </div>
     <div class="preview-body">
@@ -282,12 +300,22 @@ function openDrawer(id) {
       ${field("Destinations-URL", `<input id="f_url" value="${esc(a.url)}" placeholder="https://">`)}
     </div>
 
-    <div class="field-group-title">Creative-asset</div>
-    <div class="field-row">
-      ${field("Typ", `<select id="f_assetType">${opts(["Bild", "Film"], a.assetType)}</select>`)}
-      ${field("Asset-länk (Drive/Dropbox)", `<input id="f_assetUrl" value="${esc(a.assetUrl)}" placeholder="https:// eller filnamn">`)}
+    <div class="field-group-title">Creative-assets per format</div>
+    <p class="field-hint" style="margin:-4px 0 2px">Ladda upp en bild per format. Thumbnail krymps automatiskt. Originalfilen kan länkas i fältet under varje slot.</p>
+    <div class="asset-grid">
+      ${ASPECTS.map(fmt => { const k = fmt.replace(":", "-"); const s = (a.assets || []).find(x => x.format === fmt) || {}; return `
+      <div class="asset-slot">
+        <div class="asset-slot-head"><span class="asset-fmt">${fmt}</span>
+          <select id="f_asset_type_${k}" class="asset-type">${opts(["Bild", "Film"], s.type || "Bild")}</select></div>
+        <div class="asset-thumb" id="f_asset_thumb_${k}" title="Klicka för att ladda upp">
+          <img id="f_asset_prev_${k}" ${s.data ? `src="${esc(s.data)}"` : ""} alt="">
+          <span class="asset-ph" ${s.data ? 'style="display:none"' : ""}>+</span>
+        </div>
+        <input type="file" id="f_asset_file_${k}" accept="image/*" hidden>
+        <input type="text" id="f_asset_url_${k}" value="${esc(s.url || "")}" placeholder="Asset-länk (valfritt)">
+        <button type="button" class="btn btn-ghost asset-clear" id="f_asset_clear_${k}">Rensa</button>
+      </div>`; }).join("")}
     </div>
-    ${field("Thumbnail (ladda upp)", `<div class="thumb-drop"><img class="thumb-prev" id="f_thumbPrev" ${a.assetData ? `src="${esc(a.assetData)}"` : ""} alt=""><input type="file" id="f_thumb" accept="image/*"><button class="btn btn-ghost" id="f_thumbClear" type="button">Rensa</button></div>`)}
 
     <div class="field-group-title">Targeting</div>
     ${field("Audience / targeting", `<textarea id="f_audience">${esc(a.audience)}</textarea>`)}
@@ -318,16 +346,28 @@ function openDrawer(id) {
     const el = $("#f_" + k); if (!el) return;
     el.oninput = () => { const old = el.closest(".field").querySelector(".counter"); if (old) old.outerHTML = counterEl(a.platform, k, el.value); };
   });
-  // thumbnail upload
-  $("#f_thumb").onchange = ev => {
-    const file = ev.target.files[0]; if (!file) return;
-    makeThumb(file, 1000, url => {
-      if (!url) { alert("Kunde inte läsa bilden."); return; }
-      a.assetData = url; $("#f_thumbPrev").src = url;
-      saveLocal(); renderAds();
-    });
-  };
-  $("#f_thumbClear").onclick = () => { a.assetData = ""; $("#f_thumbPrev").removeAttribute("src"); saveLocal(); renderAds(); };
+  // asset-slots per format
+  ASPECTS.forEach(fmt => {
+    const k = fmt.replace(":", "-");
+    const fileEl = $("#f_asset_file_" + k), prev = $("#f_asset_prev_" + k), box = $("#f_asset_thumb_" + k);
+    const ph = box ? box.querySelector(".asset-ph") : null;
+    if (box && fileEl) box.onclick = () => fileEl.click();
+    if (fileEl) fileEl.onchange = ev => {
+      const file = ev.target.files[0]; if (!file) return;
+      makeThumb(file, 1000, url => {
+        if (!url) { alert("Kunde inte läsa bilden."); return; }
+        assetFor(a, fmt).data = url;
+        if (prev) prev.src = url; if (ph) ph.style.display = "none";
+        saveLocal(); renderAds();
+      });
+    };
+    const urlEl = $("#f_asset_url_" + k);
+    if (urlEl) urlEl.oninput = () => { assetFor(a, fmt).url = urlEl.value; saveLocal(); renderAds(); };
+    const typeEl = $("#f_asset_type_" + k);
+    if (typeEl) typeEl.onchange = () => { assetFor(a, fmt).type = typeEl.value; saveLocal(); renderAds(); };
+    const clr = $("#f_asset_clear_" + k);
+    if (clr) clr.onclick = () => { const s = assetFor(a, fmt); s.data = ""; if (prev) prev.removeAttribute("src"); if (ph) ph.style.display = ""; saveLocal(); renderAds(); };
+  });
 
   $("#drawer").hidden = false; $("#drawerBackdrop").hidden = false;
 }
@@ -347,7 +387,7 @@ function counterHint(platform, key, val) {
 function pullForm(a) {
   const g = id => { const el = $("#f_" + id); return el ? el.value : a[id]; };
   ["placement", "name", "campaign", "objective", "format", "headline", "primaryText", "cta", "url",
-   "assetType", "assetUrl", "audience", "region", "language", "startDate", "endDate", "budget",
+   "audience", "region", "language", "startDate", "endDate", "budget",
    "status", "approver", "approvedDate", "clientComment", "notes"].forEach(k => { const el = $("#f_" + k); if (el) a[k] = el.value; });
   a.updated = todayISO();
 }
