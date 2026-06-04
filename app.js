@@ -46,6 +46,26 @@ const uid = () => "ad_" + Date.now().toString(36) + Math.random().toString(36).s
 const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const todayISO = () => { const d = new Date(); return d.toISOString().slice(2, 10).replace(/-/g, "-"); };
 
+/* Krymp + komprimera bild till en liten thumbnail-dataURL (preview, ej originalupplösning) */
+function makeThumb(file, maxDim, cb) {
+  const reader = new FileReader();
+  reader.onerror = () => cb(null);
+  reader.onload = () => {
+    const img = new Image();
+    img.onerror = () => cb(null);
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const ctx = c.getContext("2d"); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      try { cb(c.toDataURL("image/jpeg", 0.72)); } catch (e) { cb(null); }
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 function emptyDoc(name, sg) {
   return { client: { slug: sg, name: name || "" }, campaign: { title: "", period: "", by: "Shiny Happy People", date: todayISO(), version: "v1" }, ads: [] };
 }
@@ -108,7 +128,8 @@ function clientName(sg) { const c = clients.find(c => c.slug === sg); return c ?
 /* ---------------- Persistence ---------------- */
 function saveLocal() {
   doc.client.slug = slug;
-  localStorage.setItem(lsDoc(slug), JSON.stringify(doc));
+  try { localStorage.setItem(lsDoc(slug), JSON.stringify(doc)); }
+  catch (e) { toast("Kunde inte spara lokalt (lagring full) — minska antal bilder"); }
   updateDirty();
 }
 function isDirty() { return JSON.stringify(doc) !== remoteSnapshot; }
@@ -300,11 +321,13 @@ function openDrawer(id) {
   // thumbnail upload
   $("#f_thumb").onchange = ev => {
     const file = ev.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { a.assetData = reader.result; $("#f_thumbPrev").src = reader.result; };
-    reader.readAsDataURL(file);
+    makeThumb(file, 1000, url => {
+      if (!url) { alert("Kunde inte läsa bilden."); return; }
+      a.assetData = url; $("#f_thumbPrev").src = url;
+      saveLocal(); renderAds();
+    });
   };
-  $("#f_thumbClear").onclick = () => { a.assetData = ""; $("#f_thumbPrev").removeAttribute("src"); };
+  $("#f_thumbClear").onclick = () => { a.assetData = ""; $("#f_thumbPrev").removeAttribute("src"); saveLocal(); renderAds(); };
 
   $("#drawer").hidden = false; $("#drawerBackdrop").hidden = false;
 }
